@@ -110,6 +110,9 @@ GUI); it needs `pip install playwright && playwright install chromium`.
 - **Sound alert** — plays a ~2s sound when input is needed, for when you're away.
 - **New session** — all tasks in a GUI share ONE Copilot session (context carries
   over between tasks). Click **New session** (or type `/new`) to start fresh.
+- **Queue vs redirect** — typing a new instruction (Enter) while a task runs
+  **queues** it to run next in the same session; use **Send** to redirect the
+  current task instead. Nothing typed is lost.
 
 ## Speed
 

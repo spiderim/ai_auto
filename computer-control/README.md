@@ -59,6 +59,8 @@ Type a task → **Run**. While it runs you can:
 
 - **Send** — type a correction to redirect it mid‑task (it re‑plans without
   losing context, via a `USER INTERRUPTION`).
+- **Queue next** — pressing Enter with a new instruction while a task runs
+  **queues** it to run next (in the same session) — it's never lost.
 - **Stop** — abort the current task.
 - **Compact** — shrink to a tiny always‑usable panel.
 - **Stay on top** — keep the window visible; it auto‑steps‑aside for the instant

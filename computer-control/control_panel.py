@@ -16,6 +16,7 @@ Run it with:  pythonw control_panel.py   (or)   python control_panel.py
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
 import queue
@@ -151,6 +152,7 @@ class ControlPanel:
         self._last_summary: str = ""
         self._server_proc = None
         self._stopping = False
+        self._task_queue: "collections.deque[str]" = collections.deque()
         # One Copilot session per GUI: every task resumes this same session id,
         # so context is shared across tasks (one GUI = one session).
         self._session_id = str(uuid.uuid4())
@@ -223,8 +225,8 @@ class ControlPanel:
         self.stop_btn.pack(side="left", padx=(6, 0))
         tk.Label(
             root, fg="#666", font=("Segoe UI", 8), anchor="w",
-            text="Idle: type a task \u2192 Run.   While running: type a correction \u2192 "
-                 "Send (redirects the agent), or Stop to abort.",
+            text="Idle: type a task \u2192 Run.   While running: Enter queues the next task \u00b7 "
+                 "Send redirects the current one \u00b7 Stop aborts.",
         ).pack(fill="x", padx=10, pady=(0, 6))
 
         self._append("Ready. Type a task below and press Run.\n", "sys")
@@ -521,13 +523,28 @@ class ControlPanel:
     # ---- task engine ----
     def _on_enter(self) -> None:
         text = self.entry.get().strip()
+        if not text:
+            return
         if text.lower() in ("/new", "/newsession", "/new session"):
             self.entry.delete(0, "end")
             self._new_session()
             return
         if self.proc is not None:
-            self._send_interject()
+            # A task is running -> queue this as the NEXT task (runs after, same
+            # session) so it's never lost. Use the Send button to redirect instead.
+            self.entry.delete(0, "end")
+            self._task_queue.append(text)
+            self._append(f"\U0001f552 queued (#{len(self._task_queue)}): {text}\n", "sys")
         else:
+            self._run_task()
+
+    def _maybe_run_queued(self) -> None:
+        """Run the next queued instruction once the current task has finished."""
+        if self.proc is None and self._task_queue:
+            nxt = self._task_queue.popleft()
+            self.entry.delete(0, "end")
+            self.entry.insert(0, nxt)
+            self._append(f"\u25b6 running queued: {nxt}\n", "sys")
             self._run_task()
 
     def _new_session(self) -> None:
@@ -632,6 +649,14 @@ class ControlPanel:
                         self._task_dir = None
                     self._stopping = False
                     self._raise_window(steal_focus=False)
+                    # Salvage any redirect the engine didn't consume, then run
+                    # the next queued instruction (nothing gets lost).
+                    try:
+                        for m in bridge.take_interject():
+                            self._task_queue.append(m)
+                    except Exception:
+                        pass
+                    self._maybe_run_queued()
                 elif line.strip():
                     self._append("\u00b7 " + line + "\n", "engine")
         except queue.Empty:
