@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local runtime state (never commit)
+*.key
+.env
+diag.wav
+voice_diag.py
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

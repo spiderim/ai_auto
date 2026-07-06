@@ -1,0 +1,5 @@
+# computer-control (Mode C) runtime dependencies. Windows + Python 3.10+.
+pyautogui>=0.9.54     # mouse/keyboard control (pulls in pygetwindow)
+mss>=9.0.1            # fast screen capture
+Pillow>=10.0.0        # screenshot encoding
+pyperclip>=1.8.2      # reliable clipboard paste-typing
