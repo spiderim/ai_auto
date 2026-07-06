@@ -93,8 +93,25 @@ python cc.py screenshot            # capture -> prints image path; view it to "s
 python cc.py open "notepad"
 python cc.py type "hello" --enter
 python cc.py click 640 400         # X,Y are in the last screenshot's coordinates
-python cc.py scroll --dir down --step 3 --times 5 --gap 0.3   # stepped, controllable scroll
+python cc.py scroll --dir down     # stepped, controllable scroll
 python cc.py key "ctrl+s"
+```
+
+### Automated browser (fast, no screenshots)
+
+For web tasks the engine asks whether you want the **automated (Playwright)
+browser** or your **normal** Chrome. The automated browser drives the **DOM**
+directly — navigate, read text, click/fill by text or selector — so it's much
+faster and more reliable than the screenshot→click loop, and it stays logged in
+across runs. One-time: `playwright install chromium`.
+
+```powershell
+python cc.py browser goto --url "wikipedia.org"
+python cc.py browser read                         # visible page text
+python cc.py browser links                        # clickable elements
+python cc.py browser click --text "English"
+python cc.py browser fill --selector "input[name=search]" --text "Alan Turing"
+python cc.py browser press --key "Enter"
 ```
 
 ---
@@ -140,6 +157,9 @@ Change the location with the `CC_MEMORY_DIR` environment variable.
 | `CC_SCROLL_STEP` | `3` | Default wheel notches per scroll step. |
 | `CC_SCROLL_TIMES` | `5` | Default number of scroll steps. |
 | `CC_SCROLL_GAP` | `0.3` | Default seconds between scroll steps. |
+| `CC_BROWSER_PROFILE` | `~/.computer-control/browser-profile` | Automated-browser profile (keeps logins). |
+| `CC_BROWSER_CHANNEL` | `chrome` | Automated-browser engine; empty = bundled Chromium. |
+| `CC_BROWSER_HEADLESS` | `0` | `1` runs the automated browser headless. |
 | `CC_BRIDGE_DIR` | `%TEMP%\computer_control_bridge` | GUI ↔ engine bridge folder (advanced). |
 
 ---
@@ -150,8 +170,9 @@ Change the location with the `CC_MEMORY_DIR` environment variable.
 |------|---------|
 | `SKILL.md` | Skill manifest read by the host agent. |
 | `control_panel.py` | The GUI (task input, live log, inline questions, memory). |
-| `cc.py` | Hands‑&‑eyes CLI + action server + `ask`/`confirm`/`log`/`mem-*`. |
+| `cc.py` | Hands‑&‑eyes CLI + action server + `browser` + `ask`/`confirm`/`log`/`mem-*`. |
 | `tools/computer.py` | Windows input helpers (key translation, clipboard, DPI awareness). |
+| `tools/browser.py` | Automated Playwright browser (persistent, DOM‑level, fast). |
 | `tools/bridge.py` | GUI ↔ engine file bridge (questions, logs, interjections). |
 | `tools/memory.py` | Task memory store + super index. |
 | `tools/gui.py` | Fallback `ask_user` / `confirm_action` popup dialogs. |

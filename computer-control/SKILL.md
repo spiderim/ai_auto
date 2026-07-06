@@ -59,6 +59,35 @@ a GUI interaction is unavoidable. The hands & eyes are `cc.py`:
 Coordinates are in the space of the **last screenshot**; `cc.py` scales them to
 real pixels. Always screenshot first and again after each action to verify.
 
+## Web tasks — prefer the automated (Playwright) browser
+
+For anything on the web, first ask the user (one `ask --choices`) which browser:
+
+- **Automated (Playwright) browser** — DOM-level and **fast**: navigate, read
+  page text, and click/fill by text or selector, with **no screenshots** and no
+  coordinate guessing. Strongly preferred. A single browser stays open and logged
+  in across commands (persistent profile).
+- **Normal browser** — drive the user's real Chrome visually with the
+  hands & eyes CLI (open / screenshot / click / type).
+
+Automated browser commands (persistent; no screenshots needed):
+
+| Command | Does |
+|---|---|
+| `python cc.py browser goto --url "<url>"` | Open / navigate. |
+| `python cc.py browser read` | Return the visible page text. |
+| `python cc.py browser links` | List clickable elements (by text). |
+| `python cc.py browser click --text "Sign in"` | Click by visible text. |
+| `python cc.py browser click --selector "#id"` | Click by CSS selector. |
+| `python cc.py browser fill --selector "input[name=q]" --text "hello"` | Fill a field. |
+| `python cc.py browser press --key "Enter"` | Press a key. |
+| `python cc.py browser back` · `screenshot [--out p]` · `close` | Navigate back / capture / close. |
+
+Typical flow: `goto` → `read`/`links` → `click`/`fill` → `read` … Reserve
+`browser screenshot` for the rare case you must *see* something (e.g. a captcha).
+The automated browser runs inside the persistent action server (started by the
+GUI); it needs `pip install playwright && playwright install chromium`.
+
 ### Talking to the user (shows in the GUI)
 
 - `python cc.py log "<message>"` — progress note (`--alert` pops the GUI to front).
@@ -119,6 +148,7 @@ The GUI records the timeline automatically; the engine may add key decisions wit
 1. `pip install -r requirements.txt`
 2. [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli)
    installed and logged in (`copilot` on PATH). This is the engine — no API key needed.
+3. For the automated browser: `playwright install chromium` (or have Chrome installed).
 
 ## Files
 
@@ -126,8 +156,9 @@ The GUI records the timeline automatically; the engine may add key decisions wit
 |------|---------|
 | `control_panel.py` | The GUI — task input, live log, inline questions, memory; spawns `copilot -p` per task. |
 | `launch-gui.cmd` | Double-click launcher for the GUI. |
-| `cc.py` | Hands & eyes CLI + action server + `ask`/`confirm`/`log`/`mem-*`. |
+| `cc.py` | Hands & eyes CLI + action server + `browser` + `ask`/`confirm`/`log`/`mem-*`. |
 | `tools/computer.py` | Windows input helpers (key translation, clipboard, DPI awareness). |
+| `tools/browser.py` | Automated Playwright browser (persistent, DOM-level). |
 | `tools/bridge.py` | File bridge: GUI questions/logs, always-on-top flag, user interjections. |
 | `tools/memory.py` | Task memory store under `C:\memory-copilot` (per-task folders + INDEX super file). |
 | `tools/gui.py` | Fallback `ask_user` / `confirm_action` popup dialogs. |

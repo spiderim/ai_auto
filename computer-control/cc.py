@@ -78,10 +78,12 @@ SCROLL_GAP = float(os.environ.get("CC_SCROLL_GAP", "0.3"))
 # --- persistent action server (speed) --------------------------------------
 SERVER_INFO = bridge.BRIDGE_DIR / "server.json"
 SERVER_TTL = 5.0
-# Commands worth forwarding to the warm server (they need heavy libs).
+# True only inside the long-lived `serve` process (where the browser persists).
+SERVER_MODE = False
+# Commands worth forwarding to the warm server (they need heavy libs / state).
 _FORWARD_CMDS = {
     "screenshot", "click", "move", "drag", "scroll", "type", "key",
-    "open", "focus", "windows", "launch",
+    "open", "focus", "windows", "launch", "browser",
 }
 
 # --- GUI "step aside" (Win32) ----------------------------------------------
@@ -427,6 +429,65 @@ def cmd_mem_search(args) -> int:
     return 0
 
 
+# --- automated (Playwright) browser ----------------------------------------
+def cmd_browser(args) -> int:
+    """DOM-level web automation — no screenshots needed. Runs in the persistent
+    server so one browser stays open (and logged in) across commands."""
+    if not SERVER_MODE:
+        print("The automated browser needs the persistent action server, which the "
+              "GUI starts automatically. (Or run `python cc.py serve` in another "
+              "terminal.)", file=sys.stderr)
+        return 2
+    from tools import browser as B
+
+    ok, msg = B.available()
+    if not ok:
+        print(msg, file=sys.stderr)
+        return 2
+    a = args.action
+    try:
+        if a == "goto":
+            print(B.goto(args.url or ""))
+        elif a == "read":
+            print(B.read())
+        elif a == "links":
+            print(B.links())
+        elif a == "click":
+            print(B.click(text=args.text, selector=args.selector, role=args.role, name=args.name))
+        elif a == "fill":
+            print(B.fill(selector=args.selector, text=args.text or "",
+                         label=args.label, placeholder=args.placeholder))
+        elif a == "search":
+            print(B.search(args.text or ""))
+        elif a == "wait":
+            print(B.wait(text=args.text, selector=args.selector, timeout=args.timeout or 15.0))
+        elif a == "get":
+            print(B.get(args.selector or ""))
+        elif a == "extract":
+            print(B.extract(args.selector or "", limit=args.limit or 50))
+        elif a == "url":
+            print(B.url())
+        elif a == "scroll":
+            print(B.scroll(to=args.to, px=args.px or 0))
+        elif a == "eval":
+            print(B.eval_js(args.js or ""))
+        elif a == "press":
+            print(B.press(args.key or "Enter"))
+        elif a == "back":
+            print(B.back())
+        elif a == "screenshot":
+            print(B.screenshot(args.out))
+        elif a == "close":
+            print(B.close())
+        else:
+            print(f"unknown browser action: {a}", file=sys.stderr)
+            return 2
+    except Exception as exc:
+        print(f"browser {a} failed: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 # --- CLI wiring ------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cc", description="Hands & eyes CLI (Mode B).")
@@ -545,6 +606,26 @@ def build_parser() -> argparse.ArgumentParser:
     msr.add_argument("--limit", type=int, default=10)
     msr.set_defaults(func=cmd_mem_search)
 
+    br = sub.add_parser("browser", help="Automated (Playwright) web control — DOM-level, no screenshots.")
+    br.add_argument("action", choices=["goto", "read", "links", "click", "fill", "search",
+                                       "wait", "get", "extract", "url", "scroll", "eval",
+                                       "press", "back", "screenshot", "close"])
+    br.add_argument("--url", help="URL for goto.")
+    br.add_argument("--text", help="Text to click / fill / search query.")
+    br.add_argument("--selector", help="CSS selector for click/fill/get/extract/wait.")
+    br.add_argument("--role", help="ARIA role for click (e.g. button, link).")
+    br.add_argument("--name", help="Accessible name for a --role click.")
+    br.add_argument("--label", help="Fill the field with this visible label.")
+    br.add_argument("--placeholder", help="Fill the field with this placeholder.")
+    br.add_argument("--key", help="Key to press (default Enter).")
+    br.add_argument("--to", choices=["top", "bottom"], help="Page scroll target.")
+    br.add_argument("--px", type=int, default=0, help="Page scroll pixels (default 800).")
+    br.add_argument("--js", help="JavaScript to eval in the page.")
+    br.add_argument("--timeout", type=float, default=0.0, help="Seconds for wait (default 15).")
+    br.add_argument("--limit", type=int, default=0, help="Max items for extract (default 50).")
+    br.add_argument("--out", help="Path for screenshot.")
+    br.set_defaults(func=cmd_browser)
+
     sv = sub.add_parser("serve", help="Run the persistent action server (speed).")
     sv.set_defaults(func=lambda a: 0)  # handled specially in main()
 
@@ -614,6 +695,8 @@ def _run_argv_capture(parser, argv) -> tuple[str, int]:
 
 
 def cmd_serve(args) -> int:
+    global SERVER_MODE
+    SERVER_MODE = True
     import socket
 
     _pg()  # warm pyautogui now
@@ -657,6 +740,10 @@ def cmd_serve(args) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        with contextlib.suppress(Exception):
+            from tools import browser as _B
+
+            _B.close()
         with contextlib.suppress(OSError):
             SERVER_INFO.unlink()
     return 0

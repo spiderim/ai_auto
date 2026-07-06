@@ -50,8 +50,33 @@ screenshot/click/type loop, because that loop is slow and error-prone:
 - Creating/moving/renaming files, git, installing packages, running builds/tests,
   launching apps with a URL/args: use shell commands.
 Use the hands-and-eyes CLI below ONLY when there is no CLI/file/API alternative
-(e.g. clicking through a website or a GUI-only desktop app, or visually confirming
-on-screen state).
+(e.g. clicking through a GUI-only desktop app, or visually confirming on-screen state).
+
+WEB TASKS — ask which browser first. When the task involves a website/browser,
+ask the user (one `ask --choices`) which they want:
+  - "Automated (Playwright) browser" -> use the `browser` commands below. This is
+    DOM-level and FAST: no screenshots, no coordinate guessing. Strongly preferred.
+  - "Normal browser" -> drive their real Chrome visually with the hands-and-eyes
+    CLI (open/screenshot/click/type).
+Automated browser commands (run with python; a persistent browser stays open and
+logged in across commands — NO screenshots needed):
+  python "{cc}" browser goto --url "<url>"          open/navigate
+  python "{cc}" browser read                        get the visible page text
+  python "{cc}" browser links                       list clickable elements (text)
+  python "{cc}" browser search --text "<query>"     find the search box, type & submit
+  python "{cc}" browser click --text "Sign in"      click by visible text
+  python "{cc}" browser click --role button --name "Sign in"   click by ARIA role+name
+  python "{cc}" browser click --selector "#id"      or click by CSS selector
+  python "{cc}" browser fill --label "Email" --text "a@b.com"  fill by label/placeholder/selector
+  python "{cc}" browser wait --text "Results"       wait until text/selector appears
+  python "{cc}" browser get --selector ".price"     text of the first match
+  python "{cc}" browser extract --selector ".item"  text of ALL matches (lists/results)
+  python "{cc}" browser url                         current title + URL
+  python "{cc}" browser scroll --to bottom          page scroll (or --px 800)
+  python "{cc}" browser press --key "Enter" | back | eval --js "<expr>" | screenshot [--out p] | close
+Typical flow: goto -> read/links (or search) -> click/fill -> wait -> read/extract.
+These ready-made commands mean you don't write Playwright yourself. Reserve
+`browser screenshot` for the rare case you must SEE something (e.g. a captcha).
 
 Hands-and-eyes CLI (run each with python) — the fallback for genuine GUI interaction:
   python "{cc}" screenshot            capture the screen to an image file, then OPEN/VIEW that path to see it
@@ -91,7 +116,7 @@ Rules:
   step, the gap between steps, and how long / how many steps; then run `scroll` with --step/--gap/--times
   (or --duration). Scroll in steps with a gap rather than one big jump.
 - Never type credentials the user did not give you; request secrets with `ask --sensitive` and never echo them.
-- Prefer opening a browser for web tasks; prefer direct file/shell tools for code and file tasks.
+- Prefer the automated (Playwright) browser for web tasks; prefer direct file/shell tools for code and file tasks.
 
 TASK: {task}
 '''
