@@ -108,6 +108,8 @@ GUI); it needs `pip install playwright && playwright install chromium`.
 - **Stay on top** — keeps the window visible and auto-steps-aside for the instant
   the engine clicks/screenshots (so it never blocks the target app).
 - **Sound alert** — plays a ~2s sound when input is needed, for when you're away.
+- **New session** — all tasks in a GUI share ONE Copilot session (context carries
+  over between tasks). Click **New session** (or type `/new`) to start fresh.
 
 ## Speed
 

@@ -65,6 +65,9 @@ Type a task → **Run**. While it runs you can:
   it clicks so it never blocks the app.
 - **Sound alert** — play a ~2‑second sound when input is needed (handy if you've
   stepped away).
+- **New session** — all tasks in one GUI share a single Copilot session, so
+  context carries over between tasks. Click **New session** (or type `/new`) to
+  start a fresh session with no prior context.
 
 It asks questions (free text or radio choices) and approvals **inline** in the
 window, and requires approval before payments, bookings, messages, or anything

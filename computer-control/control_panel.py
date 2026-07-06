@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import threading
+import uuid
 
 _SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SKILL_DIR not in sys.path:
@@ -34,6 +35,12 @@ from tkinter import scrolledtext
 from tools import bridge, memory
 
 CC = os.path.join(_SKILL_DIR, "cc.py")
+# Windowless Python launcher, so the engine's cc.py calls don't flash a console.
+_PYW = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+if not os.path.exists(_PYW):
+    _PYW = "pythonw"
+# No-console flag for spawned processes (Windows).
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
 
 # Instructions handed to the headless engine for every task. It makes the engine
@@ -144,6 +151,9 @@ class ControlPanel:
         self._last_summary: str = ""
         self._server_proc = None
         self._stopping = False
+        # One Copilot session per GUI: every task resumes this same session id,
+        # so context is shared across tasks (one GUI = one session).
+        self._session_id = str(uuid.uuid4())
 
         root.title("Computer Control")
         root.geometry(self._normal_geom)
@@ -160,6 +170,10 @@ class ControlPanel:
             opts, text="\U0001f514 Sound alert", variable=self.sound_ask,
             font=("Segoe UI", 8), fg="#555",
         ).pack(side="left")
+        tk.Button(
+            opts, text="\U0001f504 New session", command=self._new_session,
+            font=("Segoe UI", 8),
+        ).pack(side="left", padx=(10, 0))
         tk.Checkbutton(
             opts, text="Stay on top", variable=self.always_on_top,
             command=self._apply_topmost, font=("Segoe UI", 8), fg="#555",
@@ -506,10 +520,21 @@ class ControlPanel:
 
     # ---- task engine ----
     def _on_enter(self) -> None:
+        text = self.entry.get().strip()
+        if text.lower() in ("/new", "/newsession", "/new session"):
+            self.entry.delete(0, "end")
+            self._new_session()
+            return
         if self.proc is not None:
             self._send_interject()
         else:
             self._run_task()
+
+    def _new_session(self) -> None:
+        """Start a fresh Copilot session (new id, no shared context) on demand."""
+        self._session_id = str(uuid.uuid4())
+        self._append(f"\U0001f504 new session {self._session_id[:8]} \u2014 "
+                     "previous context cleared. Next task starts fresh.\n", "sys")
 
     def _send_interject(self) -> None:
         """Redirect the running agent with a new instruction (keeps context)."""
@@ -540,6 +565,9 @@ class ControlPanel:
             self._append(f"[memory unavailable: {exc}]\n", "sys")
 
         prompt = PROMPT_TEMPLATE.format(cc=CC, task=task)
+        # Use windowless pythonw for every cc.py call so no console flashes on
+        # each action/ask (and it can't "close a terminal" the user cares about).
+        prompt = prompt.replace(f'python "{CC}"', f'"{_PYW}" "{CC}"')
         env = dict(os.environ)
         env["CC_BRIDGE_DIR"] = str(bridge.BRIDGE_DIR)
         env["CC_MEMORY_DIR"] = str(memory.ROOT)
@@ -547,10 +575,11 @@ class ControlPanel:
             env["CC_TASK_DIR"] = str(self._task_dir)
         try:
             self.proc = subprocess.Popen(
-                ["copilot", "-p", prompt, "--allow-all"],
+                ["copilot", "-p", prompt, "--session-id", self._session_id, "--allow-all"],
                 cwd=_SKILL_DIR, env=env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding="utf-8", errors="replace", bufsize=1,
+                creationflags=_NO_WINDOW,
             )
         except FileNotFoundError:
             self._append("[error] 'copilot' CLI not found on PATH. Install GitHub Copilot CLI.\n", "sys")
@@ -560,7 +589,7 @@ class ControlPanel:
         self.run_btn.config(state="disabled")
         self.send_btn.config(state="normal")
         self.stop_btn.config(state="normal")
-        self._append("[engine started]\n", "sys")
+        self._append(f"[engine started \u00b7 session {self._session_id[:8]}]\n", "sys")
         threading.Thread(target=self._reader, args=(self.proc,), daemon=True).start()
 
     def _reader(self, proc: subprocess.Popen) -> None:
@@ -580,7 +609,11 @@ class ControlPanel:
                 line = self.out_q.get_nowait()
                 if line.startswith("\x00DONE"):
                     rc = line[5:]
-                    self._append("[engine finished, exit %s]\n" % rc, "sys")
+                    sid = self._session_id[:8]
+                    if rc == "0":
+                        self._append(f"[task done \u00b7 session {sid} still alive \u2014 type the next task]\n", "sys")
+                    else:
+                        self._append(f"[task ended (exit {rc}) \u00b7 session {sid} still alive]\n", "sys")
                     self.proc = None
                     self.run_btn.config(state="normal")
                     self.send_btn.config(state="disabled")
